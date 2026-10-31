@@ -305,12 +305,12 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file.path;
-    if (! coverImageLocalPath) {
+    if (!coverImageLocalPath) {
         throw new ApiError(400, "Avatar is Required");
     }
 
-    const  coverImage = await uploadOnCloudinary( coverImageLocalPath);
-    if ( coverImage.url) {
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    if (coverImage.url) {
         throw new ApiError(400, "Avatar is Required");
     }
 
@@ -318,7 +318,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         req.user._id,
         {
             $set: {
-                 coverImage:  coverImage.url
+                coverImage: coverImage.url
             }
         },
         {
@@ -328,6 +328,63 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     return res.status(200)
         .json(new ApiResponse(202, updatedCoverImage, "Avatar update succesfully"))
+})
+
+
+const userChannelProfile = asyncHandler(async function (req, res) {
+    const { username } = req.params;
+
+    if (!username) {
+        throw new ApiError(404, "User Not found")
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribeTo"
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                subscribeToCount: {
+                    $size: "$subscribers"
+                },
+                isSubscribedTo: {
+                    $cond: { $in: [req.user?._id, "$subscribers.subscriber"] }
+                }
+            }
+        },
+        {
+            $project: {
+                username: 1,
+                fullName: 1,
+                avatar: 1,
+                coverImage: 1,
+                subscribersCount: 1,
+                subscribedToCount: 1,
+                isSubscribed: 1
+            }
+        }
+    ])
 })
 
 export {
